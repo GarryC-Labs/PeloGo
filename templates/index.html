@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏋️ PeloGo - Device Manager</title>
+
+    <!-- TailwindCSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Socket.io -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+
+    <!-- Feather Icons -->
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+
+    <style>
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        .pulse-dot {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
+
+        .gradient-brand {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+        }
+
+        .app-checkbox {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #d1d5db;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: white;
+            position: relative;
+        }
+
+        .app-checkbox:checked {
+            background: #667eea;
+            border-color: #667eea;
+        }
+
+        .app-checkbox:checked::after {
+            content: '✓';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            line-height: 1;
+        }
+
+        .spinner {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .log-item {
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.875rem;
+            line-height: 1.4;
+        }
+
+        .log-info { color: #10b981; }
+        .log-warning { color: #f59e0b; }
+        .log-error { color: #ef4444; }
+        .log-command { color: #3b82f6; }
+        .log-stdout { color: #8b5cf6; }
+        .log-stderr { color: #ec4899; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <header class="gradient-brand text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+                        <span class="text-xl">💪</span>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-bold">PeloGo</h1>
+                        <p class="text-sm text-white/75">Device Manager</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div id="connectionStatus" class="flex items-center space-x-2 bg-white/20 px-3 py-2 rounded-lg hidden">
+                        <div class="w-2 h-2 bg-green-400 rounded-full pulse-dot"></div>
+                        <span class="text-sm font-medium">Connected</span>
+                    </div>
+                    <button onclick="showConnectionGuide()" class="flex items-center space-x-2 bg-white/20 px-4 py-2 rounded-lg hover:bg-white/30 transition font-medium">
+                        <i data-feather="help-circle" class="w-4 h-4"></i>
+                        <span>Setup Guide</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+
+            <!-- Left Sidebar -->
+            <div class="lg:col-span-1">
+                <!-- Device Selector Card -->
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6 card-hover">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <i data-feather="smartphone" class="w-5 h-5 text-indigo-600"></i>
+                        </div>
+                        <h2 class="text-lg font-semibold text-gray-900">Connected Device</h2>
+                    </div>
+
+                    <select id="deviceSelect" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-indigo-600 focus:outline-none transition bg-white cursor-pointer font-medium text-gray-900 mb-3">
+                        <option value="">Select a device...</option>
+                    </select>
+
+                    <button onclick="refreshDevices()" class="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition font-semibold shadow-md hover:shadow-lg">
+                        <i data-feather="refresh-cw" class="w-4 h-4"></i>
+                        <span>Refresh Devices</span>
+                    </button>
+
+                    <div id="deviceInfo" class="mt-6 pt-6 border-t border-gray-200 hidden">
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <p class="text-gray-500 font-semibold text-xs uppercase tracking-wide mb-1">Device Name</p>
+                                <p id="deviceName" class="text-gray-900 font-semibold">-</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-500 font-semibold text-xs uppercase tracking-wide mb-1">Serial Number</p>
+                                <p id="deviceSerial" class="text-gray-900 text-xs font-mono break-all bg-gray-100 p-2.5 rounded border border-gray-200">-</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-500 font-semibold text-xs uppercase tracking-wide mb-1">Processor</p>
+                                <p id="deviceAbi" class="text-gray-900 font-semibold">-</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-500 font-semibold text-xs uppercase tracking-wide mb-1">Connection Type</p>
+                                <div class="flex items-center space-x-2 mt-1">
+                                    <div id="deviceTransport" class="px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-full text-xs font-semibold">-</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings Card -->
+                <div id="settingsCard" class="bg-white rounded-lg shadow-md p-6 card-hover hidden">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div class="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <i data-feather="settings" class="w-5 h-5 text-amber-600"></i>
+                        </div>
+                        <h2 class="text-lg font-semibold text-gray-900">Device Settings</h2>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div>
+                            <label class="text-xs font-semibold text-gray-600 uppercase tracking-wide block mb-2">Screen Rotation</label>
+                            <select id="rotationSelect" onchange="setRotation()" class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-indigo-600 focus:outline-none transition bg-white cursor-pointer text-gray-900 font-medium">
+                                <option value="">Loading...</option>
+                            </select>
+                        </div>
+
+                        <button onclick="enableStayAwake()" class="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition font-semibold shadow-md hover:shadow-lg">
+                            <i data-feather="battery" class="w-4 h-4"></i>
+                            <span>Keep Screen Awake</span>
+                        </button>
+                    </div>
+
+                    <!-- Advanced Settings -->
+                    <div class="mt-6 pt-6 border-t border-gray-200">
+                        <details class="cursor-pointer group">
+                            <summary class="flex items-center space-x-2 font-semibold text-gray-900 hover:text-indigo-600 pb-4 select-none">
+                                <i data-feather="sliders" class="w-4 h-4 transition group-open:rotate-90"></i>
+                                <span>Advanced Options</span>
+                                <i data-feather="chevron-down" class="w-4 h-4 ml-auto group-open:rotate-180 transition"></i>
+                            </summary>
+                            <div class="space-y-3 mt-4">
+                                <div class="bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-200 rounded-lg p-4">
+                                    <div class="flex items-start space-x-3">
+                                        <i data-feather="unlock" class="w-5 h-5 text-purple-600 flex-shrink-0 mt-1"></i>
+                                        <div class="flex-1">
+                                            <h3 class="font-semibold text-purple-900 mb-2">Unlock Device Restrictions</h3>
+                                            <p class="text-sm text-purple-700 mb-3">Disable Peloton's system restrictions to use non-Peloton apps freely. You can re-lock at any time.</p>
+                                            <div class="space-y-2">
+                                                <button onclick="disablePelotonRestrictions()" id="disableRestrictionsBtn" class="w-full flex items-center justify-center space-x-2 px-4 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-semibold shadow-md hover:shadow-lg">
+                                                    <i data-feather="unlock" class="w-4 h-4"></i>
+                                                    <span>Disable Restrictions</span>
+                                                </button>
+                                                <button onclick="enablePelotonRestrictions()" id="enableRestrictionsBtn" class="w-full flex items-center justify-center space-x-2 px-4 py-2.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-semibold">
+                                                    <i data-feather="lock" class="w-4 h-4"></i>
+                                                    <span>Re-Lock Device</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </details>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="lg:col-span-3 space-y-6">
+
+                <!-- Welcome Section (No Device) -->
+                <div id="welcomeSection" class="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 rounded-lg shadow-md p-12 border border-indigo-100">
+                    <div class="text-center">
+                        <div class="mb-6 flex justify-center">
+                            <div class="w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                                <i data-feather="smartphone" class="w-12 h-12 text-white"></i>
+                            </div>
+                        </div>
+                        <h2 class="text-3xl font-bold text-gray-900 mb-3">Welcome to PeloGo</h2>
+                        <p class="text-lg text-gray-600 mb-8 max-w-xl mx-auto">Manage your Android device with ease. Connect via USB to get started with device management, app installation, and advanced controls.</p>
+
+                        <div class="bg-white rounded-lg p-6 mb-8 inline-block max-w-2xl">
+                            <h3 class="font-semibold text-gray-900 mb-4">Quick Start</h3>
+                            <div class="grid grid-cols-3 gap-4 text-left">
+                                <div class="flex gap-3">
+                                    <div class="flex-shrink-0">
+                                        <div class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 font-bold text-sm flex items-center justify-center">1</div>
+                                    </div>
+                                    <div>
+                                        <p class="font-medium text-gray-900 text-sm">Enable Developer Mode</p>
+                                        <p class="text-xs text-gray-600 mt-1">Tap Build Number 7 times in Settings</p>
+                                    </div>
+                                </div>
+                                <div class="flex gap-3">
+                                    <div class="flex-shrink-0">
+                                        <div class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 font-bold text-sm flex items-center justify-center">2</div>
+                                    </div>
+                                    <div>
+                                        <p class="font-medium text-gray-900 text-sm">Enable USB Debugging</p>
+                                        <p class="text-xs text-gray-600 mt-1">Turn on in Developer Options</p>
+                                    </div>
+                                </div>
+                                <div class="flex gap-3">
+                                    <div class="flex-shrink-0">
+                                        <div class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 font-bold text-sm flex items-center justify-center">3</div>
+                                    </div>
+                                    <div>
+                                        <p class="font-medium text-gray-900 text-sm">Connect & Authorize</p>
+                                        <p class="text-xs text-gray-600 mt-1">Plug in USB cable, tap Allow</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button onclick="showConnectionGuide()" class="px-8 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition font-semibold shadow-lg hover:shadow-xl">
+                            <i data-feather="book" class="w-4 h-4 inline mr-2"></i>
+                            View Full Setup Guide
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Apps Section -->
+                <div id="appsSection" class="bg-white rounded-lg shadow-md p-6 card-hover hidden">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                <i data-feather="package" class="w-5 h-5 text-indigo-600"></i>
+                            </div>
+                            <div>
+                                <h2 class="text-lg font-semibold text-gray-900">Available Apps</h2>
+                                <span id="appCount" class="text-xs font-semibold text-indigo-600">0 apps</span>
+                            </div>
+                        </div>
+                        <input type="text" id="appSearch" placeholder="Search apps..." class="px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-indigo-600 focus:outline-none transition text-sm w-48">
+                    </div>
+
+                    <div id="appsList" class="space-y-2 max-h-96 overflow-y-auto">
+                        <div class="text-center py-12 text-gray-400">
+                            <i data-feather="package" class="w-12 h-12 mx-auto mb-3 opacity-25"></i>
+                            <p class="font-medium">Loading apps...</p>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 flex space-x-3">
+                        <button onclick="installSelected()" id="installBtn" class="flex-1 flex items-center justify-center space-x-2 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition font-semibold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none" disabled>
+                            <i data-feather="download" class="w-5 h-5"></i>
+                            <span>Install Selected</span>
+                        </button>
+                        <button onclick="refreshInstalledApps()" id="refreshAppsBtn" class="flex-1 flex items-center justify-center space-x-2 px-6 py-3 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition font-semibold border border-blue-200 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                            <i data-feather="check-circle" class="w-5 h-5"></i>
+                            <span>View Installed</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Installed Apps Section -->
+                <div id="installedSection" class="bg-white rounded-lg shadow-md p-6 card-hover hidden">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <i data-feather="check-circle" class="w-5 h-5 text-green-600"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-gray-900">Installed Apps</h2>
+                            <span id="installedCount" class="text-xs font-semibold text-green-600">0 apps</span>
+                        </div>
+                    </div>
+
+                    <div id="installedList" class="space-y-2 max-h-64 overflow-y-auto">
+                        <div class="text-center py-6 text-gray-500">
+                            <p class="text-sm">Loading installed apps...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Logs Section -->
+                <div id="logsSection" class="bg-white rounded-lg shadow-md p-6 card-hover">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                <i data-feather="terminal" class="w-5 h-5 text-slate-600"></i>
+                            </div>
+                            <h2 class="text-lg font-semibold text-gray-900">Activity Log</h2>
+                        </div>
+                        <button onclick="clearLogs()" class="text-xs px-3 py-1.5 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition font-semibold border border-gray-200">
+                            Clear
+                        </button>
+                    </div>
+
+                    <div id="logsList" class="bg-slate-900 rounded-lg p-4 font-mono text-sm max-h-80 overflow-y-auto border border-slate-700">
+                        <div class="log-item log-info">Waiting for activity...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Loading Modal -->
+    <div id="loadingModal" class="fixed inset-0 bg-black/30 backdrop-blur-sm hidden z-40 flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-xl p-8 max-w-sm">
+            <div class="flex flex-col items-center space-y-4">
+                <div class="spinner"></div>
+                <div>
+                    <h3 id="loadingTitle" class="text-lg font-semibold text-gray-900 text-center">Installing...</h3>
+                    <p id="loadingText" class="text-sm text-gray-600 text-center mt-2">Please wait</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Connection Guide Modal -->
+    <div id="connectionGuideModal" class="fixed inset-0 bg-black/30 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl max-h-screen overflow-y-auto">
+            <div class="sticky top-0 bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6 flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <i data-feather="usb" class="w-6 h-6"></i>
+                    <h2 class="text-2xl font-bold">USB Connection Setup</h2>
+                </div>
+                <button onclick="closeConnectionGuide()" class="text-white hover:bg-white/20 p-2 rounded transition">
+                    <i data-feather="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <div class="p-6">
+                <!-- USB Connection Setup -->
+                <div class="space-y-4">
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+                        <p class="text-sm text-blue-800"><strong>💡 Tip:</strong> USB connection is recommended for initial setup as it's more reliable.</p>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div class="flex gap-4">
+                            <div class="flex-shrink-0">
+                                <div class="flex items-center justify-center h-8 w-8 rounded-full bg-indigo-600 text-white font-bold text-sm">1</div>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-900">Prepare Your Device</h4>
+                                <p class="text-gray-600 text-sm mt-1">Ensure your Peloton Bike or Tread is powered on and ready. For Peloton Bikes: verify the sensor cable is connected to the tablet.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-4">
+                            <div class="flex-shrink-0">
+                                <div class="flex items-center justify-center h-8 w-8 rounded-full bg-indigo-600 text-white font-bold text-sm">2</div>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-900">Access Settings Menu</h4>
+                                <p class="text-gray-600 text-sm mt-1">On your device tablet, navigate to <strong>Settings</strong>. If you're on a Peloton, look for <strong>Device Preferences</strong> or <strong>System Settings</strong>.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-4">
+                            <div class="flex-shrink-0">
+                                <div class="flex items-center justify-center h-8 w-8 rounded-full bg-indigo-600 text-white font-bold text-sm">3</div>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-900">Enable Developer Mode</h4>
+                                <p class="text-gray-600 text-sm mt-1">Find <strong>About Device</strong> and tap the <strong>Build Number</strong> field exactly <strong>7 times</strong> in quick succession. You'll see a message confirming Developer Options are now enabled.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-4">
+                            <div class="flex-shrink-0">
+                                <div class="flex items-center justify-center h-8 w-8 rounded-full bg-indigo-600 text-white font-bold text-sm">4</div>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-900">Enable USB Debugging</h4>
+                                <p class="text-gray-600 text-sm mt-1">Go back to Settings and find <strong>Developer Options</strong>. Enable the <strong>USB Debugging</strong> toggle.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-4">
+                            <div class="flex-shrink-0">
+                                <div class="flex items-center justify-center h-8 w-8 rounded-full bg-indigo-600 text-white font-bold text-sm">5</div>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-900">Connect USB Cable</h4>
+                                <p class="text-gray-600 text-sm mt-1">Use a quality USB cable to connect your computer to the device. A micro-USB cable works well for most equipment.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-4">
+                            <div class="flex-shrink-0">
+                                <div class="flex items-center justify-center h-8 w-8 rounded-full bg-indigo-600 text-white font-bold text-sm">6</div>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-900">Authorize Connection</h4>
+                                <p class="text-gray-600 text-sm mt-1">A prompt will appear on your device asking to authorize USB debugging. Select <strong>"Always allow from this computer"</strong> and tap OK.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-4">
+                            <div class="flex-shrink-0">
+                                <div class="flex items-center justify-center h-8 w-8 rounded-full bg-indigo-600 text-white font-bold text-sm">7</div>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-900">Refresh in PeloGo</h4>
+                                <p class="text-gray-600 text-sm mt-1">Return to PeloGo Web and click the <strong>"Refresh"</strong> button. Your device should now appear in the device selector dropdown.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Common Issues -->
+                <div class="mt-8 pt-6 border-t">
+                    <h3 class="font-semibold text-gray-900 mb-4">Common Issues & Solutions</h3>
+                    <div class="space-y-3">
+                        <details class="cursor-pointer">
+                            <summary class="font-medium text-gray-900 hover:text-indigo-600">Device not detected in PeloGo</summary>
+                            <p class="text-gray-600 text-sm mt-2">Try using a different USB cable (not all cables support data transfer). Also verify USB Debugging is enabled and the authorization prompt was accepted.</p>
+                        </details>
+                        <details class="cursor-pointer">
+                            <summary class="font-medium text-gray-900 hover:text-indigo-600">USB Debugging not appearing in Settings</summary>
+                            <p class="text-gray-600 text-sm mt-2">You haven't tapped Build Number 7 times yet. Or you may have tapped too slowly. Try again with quick, successive taps in the About Device screen.</p>
+                        </details>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================================
+        // Global State
+        // ============================================================================
+
+        let devices = [];
+        let apps = [];
+        let selectedDevice = null;
+        let selectedApps = new Set();
+        let socket = null;
+
+        // ============================================================================
+        // Socket.io Connection
+        // ============================================================================
+
+        function initSocket() {
+            socket = io();
+
+            socket.on('connect', () => {
+                addLog('Connected to server', 'info');
+                feather.replace();
+            });
+
+            socket.on('log', (entry) => {
+                addLog(entry.message, entry.tag);
+            });
+
+            socket.on('disconnect', () => {
+                addLog('Disconnected from server', 'error');
+            });
+        }
+
+        // ============================================================================
+        // Device Management
+        // ============================================================================
+
+        async function loadDevices() {
+            try {
+                const response = await fetch('/api/devices');
+                const data = await response.json();
+
+                if (data.success) {
+                    devices = data.devices || [];
+                    updateDeviceSelect();
+
+                    if (devices.length === 0) {
+                        addLog('No devices found. Connect a device via USB.', 'warning');
+                    }
+                } else {
+                    addLog(`Error: ${data.error}`, 'error');
+                }
+            } catch (e) {
+                addLog(`Failed to load devices: ${e}`, 'error');
+            }
+        }
+
+        function updateDeviceSelect() {
+            const select = document.getElementById('deviceSelect');
+            select.innerHTML = '<option value="">Select a device...</option>';
+
+            devices.forEach(device => {
+                const option = document.createElement('option');
+                option.value = device.serial;
+                option.textContent = `${device.name} (${device.transport.toUpperCase()})`;
+                select.appendChild(option);
+            });
+
+            select.onchange = (e) => {
+                selectedDevice = e.target.value;
+                if (selectedDevice) {
+                    updateDeviceInfo(selectedDevice);
+                    updateConnectionStatus(true);
+                    document.getElementById('welcomeSection').classList.add('hidden');
+                    document.getElementById('appsSection').classList.remove('hidden');
+                    document.getElementById('logsSection').classList.remove('hidden');
+                    document.getElementById('installedSection').classList.add('hidden');
+                    loadApps(selectedDevice);
+                    loadInstalledApps(selectedDevice);
+                    loadRotation(selectedDevice);
+                    document.getElementById('settingsCard').classList.remove('hidden');
+                    document.getElementById('installBtn').disabled = false;
+                    document.getElementById('refreshAppsBtn').disabled = false;
+                } else {
+                    document.getElementById('deviceInfo').classList.add('hidden');
+                    document.getElementById('settingsCard').classList.add('hidden');
+                    document.getElementById('welcomeSection').classList.remove('hidden');
+                    document.getElementById('appsSection').classList.add('hidden');
+                    document.getElementById('logsSection').classList.add('hidden');
+                    document.getElementById('installedSection').classList.add('hidden');
+                    document.getElementById('installBtn').disabled = true;
+                    document.getElementById('refreshAppsBtn').disabled = true;
+                    updateConnectionStatus(false);
+                    feather.replace();
+                }
+            };
+        }
+
+        function updateDeviceInfo(serial) {
+            const device = devices.find(d => d.serial === serial);
+            if (!device) return;
+
+            document.getElementById('deviceName').textContent = device.name || 'Unknown';
+            document.getElementById('deviceSerial').textContent = device.serial;
+            document.getElementById('deviceAbi').textContent = device.abi || 'Unknown';
+            document.getElementById('deviceTransport').textContent = device.transport.toUpperCase();
+            document.getElementById('deviceInfo').classList.remove('hidden');
+        }
+
+        async function refreshDevices() {
+            addLog('Refreshing devices...', 'info');
+            await loadDevices();
+        }
+
+        function updateConnectionStatus(isConnected) {
+            const statusEl = document.getElementById('connectionStatus');
+            if (isConnected) {
+                statusEl.classList.remove('hidden');
+            } else {
+                statusEl.classList.add('hidden');
+            }
+        }
+
+        // ============================================================================
+        // App Management
+        // ============================================================================
+
+        async function loadApps(serial) {
+            try {
+                const device = devices.find(d => d.serial === serial);
+                const abi = device?.abi || 'arm64-v8a';
+
+                const response = await fetch(`/api/apps?abi=${abi}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    apps = data.apps || [];
+                    renderAppsList();
+                    document.getElementById('appCount').textContent = `${apps.length} app${apps.length !== 1 ? 's' : ''}`;
+                } else {
+                    addLog(`Error loading apps: ${data.error}`, 'error');
+                }
+            } catch (e) {
+                addLog(`Failed to load apps: ${e}`, 'error');
+            }
+        }
+
+        function renderAppsList() {
+            const list = document.getElementById('appsList');
+            const searchTerm = document.getElementById('appSearch').value.toLowerCase();
+
+            const filtered = apps.filter(app =>
+                app.name.toLowerCase().includes(searchTerm) ||
+                app.description.toLowerCase().includes(searchTerm)
+            );
+
+            if (filtered.length === 0) {
+                list.innerHTML = '<div class="text-center py-8 text-gray-500"><p>No apps found</p></div>';
+                return;
+            }
+
+            list.innerHTML = filtered.map(app => `
+                <div class="flex items-start space-x-3 p-3 hover:bg-gray-50 rounded-lg transition cursor-pointer group">
+                    <input type="checkbox" class="app-checkbox mt-1 flex-shrink-0" value="${app.name}"
+                        onchange="toggleApp('${app.name}', this.checked)">
+                    <div class="flex-1 min-w-0">
+                        <p class="font-semibold text-gray-900 group-hover:text-indigo-600">${escapeHtml(app.name)}</p>
+                        <p class="text-sm text-gray-600 line-clamp-2">${escapeHtml(app.description)}</p>
+                        <p class="text-xs text-gray-500 mt-1">Package: <span class="font-mono">${escapeHtml(app.package_name)}</span></p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function toggleApp(name, checked) {
+            if (checked) {
+                selectedApps.add(name);
+            } else {
+                selectedApps.delete(name);
+            }
+        }
+
+        document.getElementById('appSearch').addEventListener('input', renderAppsList);
+
+        async function installSelected() {
+            if (!selectedDevice) {
+                addLog('Please select a device', 'error');
+                return;
+            }
+
+            if (selectedApps.size === 0) {
+                addLog('Please select apps to install', 'error');
+                return;
+            }
+
+            const appNames = Array.from(selectedApps);
+            showLoading(`Installing ${appNames.length} app(s)...`);
+
+            for (const appName of appNames) {
+                const app = apps.find(a => a.name === appName);
+                if (app) {
+                    try {
+                        updateLoading(`Installing ${appName}...`);
+                        const response = await fetch(`/api/devices/${selectedDevice}/apps/install`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                app_name: app.name,
+                                app_url: app.url
+                            })
+                        });
+
+                        const data = await response.json();
+                        if (data.success) {
+                            addLog(`✅ ${appName} installed successfully!`, 'info');
+                            selectedApps.delete(appName);
+                        } else {
+                            addLog(`❌ Failed to install ${appName}: ${data.message}`, 'error');
+                        }
+                    } catch (e) {
+                        addLog(`Error installing ${appName}: ${e}`, 'error');
+                    }
+                }
+            }
+
+            hideLoading();
+            renderAppsList();
+            await loadInstalledApps(selectedDevice);
+        }
+
+        async function loadInstalledApps(serial) {
+            try {
+                const response = await fetch(`/api/devices/${serial}/apps/installed`);
+                const data = await response.json();
+
+                if (data.success) {
+                    const packages = data.packages || [];
+                    renderInstalledApps(packages);
+                    document.getElementById('installedCount').textContent = `${packages.length} app${packages.length !== 1 ? 's' : ''}`;
+
+                    if (packages.length > 0) {
+                        document.getElementById('installedSection').classList.remove('hidden');
+                    }
+                }
+            } catch (e) {
+                addLog(`Failed to load installed apps: ${e}`, 'error');
+            }
+        }
+
+        function renderInstalledApps(packages) {
+            const list = document.getElementById('installedList');
+
+            if (packages.length === 0) {
+                list.innerHTML = '<div class="text-center py-6 text-gray-500"><p class="text-sm">No apps installed</p></div>';
+                return;
+            }
+
+            list.innerHTML = packages.map(pkg => `
+                <div class="flex items-center justify-between p-3 hover:bg-green-50 rounded-lg transition group border border-transparent hover:border-green-200">
+                    <div class="flex items-center space-x-2 flex-1 min-w-0">
+                        <i data-feather="check-circle" class="w-4 h-4 text-green-600 flex-shrink-0"></i>
+                        <span class="text-sm text-gray-900 truncate font-medium">${escapeHtml(pkg)}</span>
+                    </div>
+                    <button onclick="uninstallApp('${pkg}')" class="ml-2 px-3 py-1.5 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition font-semibold opacity-0 group-hover:opacity-100">
+                        Remove
+                    </button>
+                </div>
+            `).join('');
+
+            feather.replace();
+        }
+
+        async function refreshInstalledApps() {
+            if (selectedDevice) {
+                await loadInstalledApps(selectedDevice);
+            }
+        }
+
+        async function uninstallApp(packageName) {
+            if (!selectedDevice) return;
+
+            if (!confirm(`Uninstall ${packageName}?`)) return;
+
+            try {
+                addLog(`Uninstalling ${packageName}...`, 'info');
+                const response = await fetch(
+                    `/api/devices/${selectedDevice}/apps/${encodeURIComponent(packageName)}`,
+                    { method: 'DELETE' }
+                );
+
+                const data = await response.json();
+                if (data.success) {
+                    addLog(data.message, 'info');
+                    await loadInstalledApps(selectedDevice);
+                } else {
+                    addLog(data.message, 'error');
+                }
+            } catch (e) {
+                addLog(`Error uninstalling: ${e}`, 'error');
+            }
+        }
+
+        // ============================================================================
+        // Device Settings
+        // ============================================================================
+
+        async function loadRotation(serial) {
+            try {
+                const response = await fetch(`/api/devices/${serial}/settings/rotation`);
+                const data = await response.json();
+
+                if (data.success) {
+                    const select = document.getElementById('rotationSelect');
+                    select.innerHTML = `
+                        <option value="0" ${data.rotation === 0 ? 'selected' : ''}>Portrait</option>
+                        <option value="1" ${data.rotation === 1 ? 'selected' : ''}>Landscape</option>
+                        <option value="2" ${data.rotation === 2 ? 'selected' : ''}>Reverse Portrait</option>
+                        <option value="3" ${data.rotation === 3 ? 'selected' : ''}>Reverse Landscape</option>
+                    `;
+                }
+            } catch (e) {
+                addLog(`Error loading rotation: ${e}`, 'error');
+            }
+        }
+
+        async function setRotation() {
+            if (!selectedDevice) return;
+
+            const rotation = parseInt(document.getElementById('rotationSelect').value);
+
+            try {
+                const response = await fetch(`/api/devices/${selectedDevice}/settings/rotation`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ rotation })
+                });
+
+                const data = await response.json();
+                if (!data.success) {
+                    addLog(`Error: ${data.message}`, 'error');
+                }
+            } catch (e) {
+                addLog(`Error setting rotation: ${e}`, 'error');
+            }
+        }
+
+        async function enableStayAwake() {
+            if (!selectedDevice) {
+                addLog('Please select a device', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/devices/${selectedDevice}/settings/stay-awake`, {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+                addLog(data.message, data.success ? 'info' : 'error');
+            } catch (e) {
+                addLog(`Error: ${e}`, 'error');
+            }
+        }
+
+        // ============================================================================
+        // Logging
+        // ============================================================================
+
+        function addLog(message, tag = 'info') {
+            const logsList = document.getElementById('logsList');
+            const time = new Date().toLocaleTimeString();
+
+            const logItem = document.createElement('div');
+            logItem.className = `log-item log-${tag}`;
+            logItem.textContent = `[${time}] ${message}`;
+
+            logsList.appendChild(logItem);
+            logsList.scrollTop = logsList.scrollHeight;
+
+            // Keep only last 200 logs
+            const items = logsList.querySelectorAll('.log-item');
+            if (items.length > 200) {
+                items[0].remove();
+            }
+        }
+
+        async function clearLogs() {
+            try {
+                await fetch('/api/logs/clear', { method: 'POST' });
+                document.getElementById('logsList').innerHTML = '<div class="log-item log-info">Logs cleared</div>';
+            } catch (e) {
+                console.error('Error clearing logs:', e);
+            }
+        }
+
+        // ============================================================================
+        // UI Helpers
+        // ============================================================================
+
+        function showLoading(title = 'Loading...', text = 'Please wait') {
+            document.getElementById('loadingTitle').textContent = title;
+            document.getElementById('loadingText').textContent = text;
+            document.getElementById('loadingModal').classList.remove('hidden');
+        }
+
+        function updateLoading(title = 'Loading...') {
+            document.getElementById('loadingTitle').textContent = title;
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingModal').classList.add('hidden');
+        }
+
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
+        // ============================================================================
+        // Initialization
+        // ============================================================================
+
+        async function init() {
+            initSocket();
+            feather.replace();
+            document.getElementById('welcomeSection').classList.remove('hidden');
+            document.getElementById('appsSection').classList.add('hidden');
+            document.getElementById('logsSection').classList.add('hidden');
+            document.getElementById('installedSection').classList.add('hidden');
+            await loadDevices();
+        }
+
+        // ============================================================================
+        // Connection Guide Functions
+        // ============================================================================
+
+        function showConnectionGuide() {
+            document.getElementById('connectionGuideModal').classList.remove('hidden');
+            feather.replace();
+        }
+
+        function closeConnectionGuide() {
+            document.getElementById('connectionGuideModal').classList.add('hidden');
+        }
+
+
+        // Close guide when clicking outside
+        document.getElementById('connectionGuideModal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('connectionGuideModal')) {
+                closeConnectionGuide();
+            }
+        });
+
+        // ============================================================================
+        // Advanced Options - Peloton Restrictions
+        // ============================================================================
+
+        async function disablePelotonRestrictions() {
+            if (!selectedDevice) {
+                addLog('Please select a device', 'error');
+                return;
+            }
+
+            if (!confirm('⚠️ This will disable Peloton\'s system restrictions, allowing access to non-Peloton apps.\n\nYou can re-enable them at any time.\n\nContinue?')) {
+                return;
+            }
+
+            showLoading('Disabling Peloton Restrictions', 'Please wait...');
+
+            try {
+                const response = await fetch(
+                    `/api/devices/${selectedDevice}/peloton/disable-restrictions`,
+                    { method: 'POST' }
+                );
+
+                const data = await response.json();
+                if (data.success) {
+                    addLog('✅ Peloton restrictions successfully disabled!', 'info');
+                    addLog('💡 You can now install and use other apps freely.', 'info');
+                    addLog('🔄 You may need to reboot your device for changes to take effect.', 'info');
+                } else {
+                    addLog(`❌ Failed to disable restrictions: ${data.message}`, 'error');
+                }
+            } catch (e) {
+                addLog(`Error: ${e}`, 'error');
+            }
+
+            hideLoading();
+        }
+
+        async function enablePelotonRestrictions() {
+            if (!selectedDevice) {
+                addLog('Please select a device', 'error');
+                return;
+            }
+
+            if (!confirm('⚠️ This will re-enable Peloton\'s system restrictions.\n\nYour device will be locked down again.\n\nContinue?')) {
+                return;
+            }
+
+            showLoading('Re-Enabling Peloton Restrictions', 'Please wait...');
+
+            try {
+                const response = await fetch(
+                    `/api/devices/${selectedDevice}/peloton/enable-restrictions`,
+                    { method: 'POST' }
+                );
+
+                const data = await response.json();
+                if (data.success) {
+                    addLog('✅ Peloton restrictions successfully re-enabled!', 'info');
+                    addLog('🔄 You may need to reboot your device for changes to take effect.', 'info');
+                } else {
+                    addLog(`❌ Failed to enable restrictions: ${data.message}`, 'error');
+                }
+            } catch (e) {
+                addLog(`Error: ${e}`, 'error');
+            }
+
+            hideLoading();
+        }
+
+        // Start the app
+        init();
+    </script>
+</body>
+</html>
