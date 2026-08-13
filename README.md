@@ -465,3 +465,5 @@ By using this application, users acknowledge:
 **Built with ❤️ for fitness enthusiasts and Android developers**
 
 Developed with support from [Claude AI](https://claude.ai)
+
+If PeloGo has been helpful to you in any way, consider [buying me a coffee ☕](https://buymeacoffee.com/eurogc) — it helps support development and maintenance.
