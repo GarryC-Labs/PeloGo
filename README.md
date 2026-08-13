@@ -93,6 +93,23 @@ Then open: **http://localhost:5004**
 
 ## Usage Guide
 
+### UI Screenshots
+
+#### Initial State (No Device Connected)
+Before you connect a device, PeloGo displays a clean interface ready for you to plug in your Android device:
+
+![PeloGo Interface - Initial State](images/pelogo-1.png)
+
+#### Device Detected (Ready to Select)
+Once you plug in your device via USB and it's authorized, the device appears in the dropdown menu for selection:
+
+![PeloGo Interface - Device in Dropdown](images/pelogo-2.png)
+
+#### Device Selected (Full Management Interface)
+After selecting your device, you get access to the complete management interface showing device info, available apps, installed apps, and control options:
+
+![PeloGo Interface - Device Selected](images/pelogo-3.png)
+
 ### Getting Started Workflow
 
 **If choosing to use PeloGo, the following steps can be performed once PeloGo is running and device is connected via USB:**
