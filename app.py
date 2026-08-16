@@ -36,10 +36,20 @@ class LogCapture:
         self.logs = []
         self.max_logs = 500
 
+        # Initialize log file
+        log_dir = Path(__file__).parent / 'logs'
+        log_dir.mkdir(exist_ok=True)
+        self.log_file = log_dir / 'pelogo.log'
+
+        # Clear old log file on startup
+        if self.log_file.exists():
+            self.log_file.unlink()
+
     def add_log(self, message: str, tag: str = 'info'):
-        """Add log entry and broadcast to WebSocket clients"""
+        """Add log entry, write to file, and broadcast to WebSocket clients"""
+        timestamp = datetime.now().strftime('%H:%M:%S')
         entry = {
-            'timestamp': datetime.now().strftime('%H:%M:%S'),
+            'timestamp': timestamp,
             'message': message,
             'tag': tag
         }
@@ -48,6 +58,14 @@ class LogCapture:
         # Keep only last N logs
         if len(self.logs) > self.max_logs:
             self.logs = self.logs[-self.max_logs:]
+
+        # Write to log file
+        try:
+            with open(self.log_file, 'a') as f:
+                f.write(f"[{timestamp}] {message}\n")
+                f.flush()
+        except Exception as e:
+            print(f"Failed to write log file: {e}")
 
         # Broadcast to all connected WebSocket clients (only if clients exist)
         if connected_clients:
@@ -58,7 +76,7 @@ class LogCapture:
                 pass
 
         # Print to console as well
-        print(f"[{entry['timestamp']}] {message}")
+        print(f"[{timestamp}] {message}")
 
     def get_logs(self):
         return self.logs
@@ -299,6 +317,35 @@ def clear_logs():
     """Clear logs"""
     log_capture.clear()
     return jsonify({'success': True})
+
+
+@app.route('/api/logs/download', methods=['GET'])
+def download_logs():
+    """Download log file"""
+    try:
+        log_file = log_capture.log_file
+        if log_file.exists():
+            with open(log_file, 'r') as f:
+                content = f.read()
+            return jsonify({'success': True, 'logs': content, 'file': log_file.name})
+        else:
+            return jsonify({'success': False, 'error': 'Log file not found'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/logs/pelogo.log', methods=['GET'])
+def get_log_file():
+    """Get raw log file"""
+    try:
+        log_file = log_capture.log_file
+        if log_file.exists():
+            with open(log_file, 'r') as f:
+                return f.read(), 200, {'Content-Type': 'text/plain'}
+        else:
+            return 'No logs yet', 404
+    except Exception as e:
+        return f'Error: {e}', 500
 
 
 @app.route('/api/devices/<serial>/peloton/disable-restrictions', methods=['POST'])

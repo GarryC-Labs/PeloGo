@@ -229,7 +229,15 @@ class AdbService:
         """Download APK from URL and install it"""
         try:
             self.log(f"Downloading {app_name}...", 'info')
-            response = requests.get(app_url, timeout=300, stream=True)
+
+            # Handle GitHub API URLs
+            if 'api.github.com' in app_url:
+                app_url = self._resolve_github_release_url(app_url, app_name)
+                if not app_url:
+                    self.log(f"Failed to resolve GitHub release URL", 'error')
+                    return False
+
+            response = requests.get(app_url, timeout=300, stream=True, allow_redirects=True)
             response.raise_for_status()
 
             total_size = int(response.headers.get('content-length', 0))
@@ -261,6 +269,37 @@ class AdbService:
         except Exception as e:
             self.log(f"Download/install failed: {e}", 'error')
             return False
+
+    def _resolve_github_release_url(self, api_url: str, app_name: str) -> Optional[str]:
+        """Resolve GitHub API URL to actual APK download URL"""
+        try:
+            response = requests.get(api_url, timeout=30)
+            response.raise_for_status()
+            data = response.json()
+
+            # Find APK asset matching app_name or fallback to first .apk
+            assets = data.get('assets', [])
+            if not assets:
+                self.log(f"No assets found in GitHub release", 'warning')
+                return None
+
+            # Try to find exact match first
+            for asset in assets:
+                if asset['name'].lower() == app_name.lower():
+                    return asset['browser_download_url']
+
+            # Find any .apk file
+            for asset in assets:
+                if asset['name'].lower().endswith('.apk'):
+                    self.log(f"Using asset: {asset['name']}", 'info')
+                    return asset['browser_download_url']
+
+            self.log(f"No APK file found in release assets", 'warning')
+            return None
+
+        except Exception as e:
+            self.log(f"Failed to resolve GitHub release: {e}", 'error')
+            return None
 
     def get_installed_launchers(self, serial: str) -> List[Dict[str, str]]:
         """Get installed launcher apps"""

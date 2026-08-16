@@ -13,8 +13,8 @@
             "abi": "arm64-v8a"
         },
         "Lawnchair Launcher": {
-            "url": "https://github.com/LawnchairLauncher/lawnchair/releases/download/v15.0.0-beta2/Lawnchair.15.0.0.Beta.2.apk",
-            "package_name": "Lawnchair.15.0.0.Beta.2.apk",
+            "url": "https://api.github.com/repos/LawnchairLauncher/lawnchair/releases/latest",
+            "package_name": "Lawnchair.apk",
             "description": "Preferred open source launcher for OpenPelo.\nRotate screen in app settings behavior-> screen rotation",
             "abi": "arm64-v8a"
         },
